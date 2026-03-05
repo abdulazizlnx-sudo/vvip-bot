@@ -59,29 +59,53 @@ async def approve_claim(ctx):
     if not is_admin(ctx.author):
         await ctx.reply("❌ Lo tidak punya izin!")
         return
+
     if not ctx.message.reference:
-        await ctx.reply("❌ Reply ke pesan claim user dulu!")
+        await ctx.reply("❌ Reply ke pesan USER (username), bukan pesan bot!")
         return
+
     ref_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+
+    # 🔥 Jangan izinkan approve pesan bot
+    if ref_msg.author.bot:
+        await ctx.reply("❌ Reply langsung ke pesan USER yang berisi username!")
+        return
+
     roblox_username = ref_msg.content.strip()
+
     await ctx.reply(f"⏳ Memproses VVIP untuk **{roblox_username}**...")
+
     async with aiohttp.ClientSession() as session:
         try:
-            payload = {"username": roblox_username, "secret": MIDDLEWARE_SECRET, "given_by": str(ctx.author)}
-            async with session.post(f"{MIDDLEWARE_URL}/give-vvip", json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            payload = {
+                "username": roblox_username,
+                "secret": MIDDLEWARE_SECRET,
+                "given_by": str(ctx.author)
+            }
+
+            async with session.post(
+                f"{MIDDLEWARE_URL}/give-vvip",
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+
                 data = await resp.json()
+
                 if data.get("success"):
                     await ref_msg.clear_reactions()
                     await ref_msg.add_reaction("✅")
+
                     embed = discord.Embed(title="✅ VVIP Approved!", color=discord.Color.gold())
                     embed.add_field(name="Username", value=roblox_username, inline=True)
                     embed.add_field(name="Roblox ID", value=str(data.get("roblox_id", "?")), inline=True)
                     embed.add_field(name="Admin", value=str(ctx.author), inline=True)
+
                     await ctx.reply(embed=embed)
                 else:
                     await ref_msg.clear_reactions()
                     await ref_msg.add_reaction("❌")
                     await ctx.reply(f"❌ Gagal: **{data.get('error')}**")
+
         except Exception as e:
             await ctx.reply(f"❌ Error: {e}")
 
